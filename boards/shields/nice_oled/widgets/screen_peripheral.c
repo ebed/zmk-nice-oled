@@ -26,11 +26,11 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 // Luna (assets/luna_images.c, stored upright — no rotation needed) drawn on
 // the canvas: sits when idle, walks on every local key press of this half,
 // runs when typing fast, and sits again via an LVGL one-shot timer.
-LV_IMG_DECLARE(dog_sit1);
-LV_IMG_DECLARE(dog_walk1);
-LV_IMG_DECLARE(dog_walk2);
-LV_IMG_DECLARE(dog_run1);
-LV_IMG_DECLARE(dog_run2);
+LV_IMG_DECLARE(dog_sit1_2x);
+LV_IMG_DECLARE(dog_walk1_2x);
+LV_IMG_DECLARE(dog_walk2_2x);
+LV_IMG_DECLARE(dog_run1_2x);
+LV_IMG_DECLARE(dog_run2_2x);
 
 // Presses closer together than this use the running frames
 #define BONGO_FAST_MS 200
@@ -38,8 +38,8 @@ LV_IMG_DECLARE(dog_run2);
 // queue display work against the BLE stack — key latency over animation fps.
 #define BONGO_MIN_REDRAW_MS 125
 
-#define BONGO_X 18  // (68 - 32) / 2
-#define BONGO_Y 110
+#define BONGO_X 2   // (68 - 64) / 2 — frames 2x de 64px
+#define BONGO_Y 100
 #define BONGO_IDLE_MS 400
 
 // 0 = sit (idle), 1/2 = walk (typing), 3/4 = run (fast typing)
@@ -92,11 +92,11 @@ static void draw_canvas(lv_obj_t *widget, lv_color_t cbuf[], const struct status
     {
         lv_draw_img_dsc_t img_dsc;
         lv_draw_img_dsc_init(&img_dsc);
-        const lv_img_dsc_t *frame = bongo_frame == 1   ? &dog_walk1
-                                    : bongo_frame == 2 ? &dog_walk2
-                                    : bongo_frame == 3 ? &dog_run1
-                                    : bongo_frame == 4 ? &dog_run2
-                                                       : &dog_sit1;
+        const lv_img_dsc_t *frame = bongo_frame == 1   ? &dog_walk1_2x
+                                    : bongo_frame == 2 ? &dog_walk2_2x
+                                    : bongo_frame == 3 ? &dog_run1_2x
+                                    : bongo_frame == 4 ? &dog_run2_2x
+                                                       : &dog_sit1_2x;
         lv_canvas_draw_img(canvas, BONGO_X, BONGO_Y, frame, &img_dsc);
     }
 #endif
