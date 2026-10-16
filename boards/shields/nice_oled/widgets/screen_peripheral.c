@@ -34,6 +34,9 @@ LV_IMG_DECLARE(dog_run2);
 
 // Presses closer together than this use the running frames
 #define BONGO_FAST_MS 200
+// Cap canvas redraws (full-screen SPI flush each) so fast typing does not
+// queue display work against the BLE stack — key latency over animation fps.
+#define BONGO_MIN_REDRAW_MS 125
 
 #define BONGO_X 18  // (68 - 32) / 2
 #define BONGO_Y 110
@@ -42,6 +45,7 @@ LV_IMG_DECLARE(dog_run2);
 // 0 = sit (idle), 1/2 = walk (typing), 3/4 = run (fast typing)
 static uint8_t bongo_frame;
 static int64_t bongo_last_press_ms;
+static int64_t bongo_last_redraw_ms;
 static lv_timer_t *bongo_idle_timer;
 #endif
 
@@ -221,6 +225,12 @@ static void bongo_slap_update_cb(struct bongo_slap_state state) {
         lv_timer_reset(bongo_idle_timer);
         lv_timer_resume(bongo_idle_timer);
     }
+    // Throttled: skip the expensive redraw if one just happened; the frame
+    // state is already updated and the idle timer paints the final state.
+    if (now - bongo_last_redraw_ms < BONGO_MIN_REDRAW_MS) {
+        return;
+    }
+    bongo_last_redraw_ms = now;
     bongo_redraw_all();
 }
 
