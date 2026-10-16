@@ -900,6 +900,18 @@ static void draw_canvas(lv_obj_t *widget, lv_color_t cbuf[], const struct status
 #if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_MODIFIERS_INDICATORS_FIXED)
     // Dibuja los modificadores si la nueva Kconfig está habilitada
     draw_mods_status(canvas, state);
+#if IS_ENABLED(CONFIG_NICE_EPAPER_ON)
+    {
+        // Hard-clear the band between the modifier row and the layer label:
+        // dotted ghost rows keep appearing right under the 14px symbols on
+        // hardware (suspected LVGL indexed-1bit draw spill for widths that
+        // are not byte-multiples). Erasing after all draws is deterministic.
+        lv_draw_rect_dsc_t band_dsc;
+        init_rect_dsc(&band_dsc, LVGL_BACKGROUND);
+        int band_y = CONFIG_NICE_OLED_WIDGET_MODIFIERS_CUSTOM_Y + 14;
+        lv_canvas_draw_rect(canvas, 0, band_y, 68, 145 - band_y, &band_dsc);
+    }
+#endif
 #endif // <-- NUEVO
 
     // Rotate for horizontal display
