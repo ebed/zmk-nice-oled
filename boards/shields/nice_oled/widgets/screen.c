@@ -296,9 +296,16 @@ static void draw_mods_status(lv_obj_t *canvas, const struct status_state *state)
     lv_draw_img_dsc_t img_dsc;
     lv_draw_img_dsc_init(&img_dsc);
 
+#if IS_ENABLED(CONFIG_NICE_EPAPER_ON)
+    // Imágenes regeneradas a 16px de ancho (filas de 2 bytes exactos);
+    // 4 símbolos x 16px = 64px en el canvas de 68 -> sin spacing.
+    const int img_size = 16;
+    const int spacing = 0;
+#else
     // Las imágenes son 14x14 píxeles
     const int img_size = 14;
     const int spacing = 2;
+#endif
 
     // Posición Base según tipo de pantalla y layout
 #if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_MODIFIERS_INDICATORS_FIXED_VER)
@@ -909,7 +916,7 @@ static void draw_canvas(lv_obj_t *widget, lv_color_t cbuf[], const struct status
         lv_draw_rect_dsc_t band_dsc;
         init_rect_dsc(&band_dsc, LVGL_BACKGROUND);
         int band_y = CONFIG_NICE_OLED_WIDGET_MODIFIERS_CUSTOM_Y + 14;
-        lv_canvas_draw_rect(canvas, 0, band_y, 68, 145 - band_y, &band_dsc);
+        lv_canvas_draw_rect(canvas, 0, band_y, 68, 146 - band_y, &band_dsc);
     }
 #endif
 #endif // <-- NUEVO
