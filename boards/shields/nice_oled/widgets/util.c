@@ -12,15 +12,17 @@ void rotate_canvas(lv_obj_t *canvas, lv_color_t cbuf[]) {
   static lv_color_t cbuf_tmp[CANVAS_HEIGHT * CANVAS_HEIGHT];
   memcpy(cbuf_tmp, cbuf, sizeof(cbuf_tmp));
 
-  lv_img_dsc_t img;
-  img.data = (void *)cbuf_tmp;
-  img.header.cf = LV_IMG_CF_TRUE_COLOR;
-  img.header.w = CANVAS_HEIGHT;
-  img.header.h = CANVAS_HEIGHT;
-
-  lv_canvas_fill_bg(canvas, LVGL_BACKGROUND, LV_OPA_COVER);
-  lv_canvas_transform(canvas, &img, 900, LV_IMG_ZOOM_NONE, -1, 0,
-                      CANVAS_HEIGHT / 2, CANVAS_HEIGHT / 2, false);
+  // Exact 90-degree clockwise pixel rotation. lv_canvas_transform uses
+  // fixed-point trig where sin(90) != 1, so its resampling duplicated
+  // pixel rows as dotted "ghosts" near the canvas edges (visible under
+  // the modifier row and distorting glyphs like the O in COLEMAK).
+  for (int y = 0; y < CANVAS_HEIGHT; y++) {
+    for (int x = 0; x < CANVAS_HEIGHT; x++) {
+      cbuf[y * CANVAS_HEIGHT + x] =
+          cbuf_tmp[(CANVAS_HEIGHT - 1 - x) * CANVAS_HEIGHT + y];
+    }
+  }
+  lv_obj_invalidate(canvas);
 }
 
 void draw_background(lv_obj_t *canvas) {
