@@ -1,5 +1,6 @@
 #include "battery.h"
 #include <fonts.h>
+#include <stdio.h>
 #include <zephyr/kernel.h>
 
 LV_IMG_DECLARE(bolt);
@@ -100,7 +101,16 @@ void draw_battery_status(lv_obj_t *canvas, const struct status_state *state) {
 #if IS_ENABLED(CONFIG_NICE_EPAPER_ON)
     lv_draw_label_dsc_t label_left_dsc;
     init_label_dsc(&label_left_dsc, LVGL_FOREGROUND, &pixel_operator_mono_16, LV_TEXT_ALIGN_LEFT);
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+    // Active BT profile instead of the static "BAT" label; the shared widget
+    // state carries active_profile_index (updated by the output listener).
+    // Peripheral halves never receive profile updates, so they keep "BAT".
+    char profile_text[4] = {};
+    snprintf(profile_text, sizeof(profile_text), "P%d", state->active_profile_index + 1);
+    lv_canvas_draw_text(canvas, 0, 19, 25, &label_left_dsc, profile_text);
+#else
     lv_canvas_draw_text(canvas, 0, 19, 25, &label_left_dsc, "BAT");
+#endif
 #endif // CONFIG_NICE_EPAPER_ON
     if (state->charging) {
         draw_charging_level(canvas, state);

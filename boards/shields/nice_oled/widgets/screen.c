@@ -257,6 +257,10 @@ struct mods_status_state {
     uint8_t mods;
 };
 
+// Display order mirrors the home-row mods (A=GUI, R=Alt, S=Ctrl, T=Shift);
+// each slot maps to its HID modifier bit (CTRL=0, SHIFT=1, ALT=2, GUI=3).
+static const uint8_t mod_bit_order[4] = {3, 2, 0, 1};
+
 // Declaraciones de imágenes de símbolos reales (de modifiers_270.c)
 #if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_MODIFIERS_INDICATORS_FIXED_SYMBOL)
 LV_IMG_DECLARE(control_0);
@@ -276,12 +280,12 @@ LV_IMG_DECLARE(win_white_0);
 // Orden: Control, Shift, Alt/Opt, Gui/Cmd/Win
 #if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_MODIFIERS_INDICATORS_FIXED_SYMBOL_WINDOWS)
 // Windows: Control, Shift, Alt, Win
-static const lv_img_dsc_t *mod_imgs_normal[4] = {&control_0, &shift_0, &alt_0, &win_0};
-static const lv_img_dsc_t *mod_imgs_active[4] = {&control_white_0, &shift_white_0, &alt_white_0, &win_white_0};
+static const lv_img_dsc_t *mod_imgs_normal[4] = {&win_0, &alt_0, &control_0, &shift_0};
+static const lv_img_dsc_t *mod_imgs_active[4] = {&win_white_0, &alt_white_0, &control_white_0, &shift_white_0};
 #else
 // macOS (default): Control, Shift, Option, Command
-static const lv_img_dsc_t *mod_imgs_normal[4] = {&control_0, &shift_0, &opt_0, &cmd_0};
-static const lv_img_dsc_t *mod_imgs_active[4] = {&control_white_0, &shift_white_0, &opt_white_0, &cmd_white_0};
+static const lv_img_dsc_t *mod_imgs_normal[4] = {&cmd_0, &opt_0, &control_0, &shift_0};
+static const lv_img_dsc_t *mod_imgs_active[4] = {&cmd_white_0, &opt_white_0, &control_white_0, &shift_white_0};
 #endif
 #endif // CONFIG_NICE_OLED_WIDGET_MODIFIERS_INDICATORS_FIXED_SYMBOL
 
@@ -317,7 +321,8 @@ static void draw_mods_status(lv_obj_t *canvas, const struct status_state *state)
     const int base_y = 62; // start base y = 38, test 62 like raw hid
 
     for (int i = 0; i < 4; i++) {
-        bool selected = (state->mod_state >> i) & 1 || (state->mod_state >> (i + 4)) & 1;
+        bool selected = (state->mod_state >> mod_bit_order[i]) & 1 ||
+                        (state->mod_state >> (mod_bit_order[i] + 4)) & 1;
         int current_x = base_x;
         int current_y = base_y + i * (img_size + spacing);
         const lv_img_dsc_t *img = selected ? mod_imgs_active[i] : mod_imgs_normal[i];
@@ -330,7 +335,8 @@ static void draw_mods_status(lv_obj_t *canvas, const struct status_state *state)
     const int base_y = CONFIG_NICE_OLED_WIDGET_MODIFIERS_CUSTOM_Y;
 
     for (int i = 0; i < 4; i++) {
-        bool selected = (state->mod_state >> i) & 1 || (state->mod_state >> (i + 4)) & 1;
+        bool selected = (state->mod_state >> mod_bit_order[i]) & 1 ||
+                        (state->mod_state >> (mod_bit_order[i] + 4)) & 1;
         int current_x = base_x + i * (img_size + spacing);
         int current_y = base_y;
         const lv_img_dsc_t *img = selected ? mod_imgs_active[i] : mod_imgs_normal[i];
@@ -350,7 +356,8 @@ static void draw_mods_status(lv_obj_t *canvas, const struct status_state *state)
     };
 
     for (int i = 0; i < 4; i++) {
-        bool selected = (state->mod_state >> i) & 1 || (state->mod_state >> (i + 4)) & 1;
+        bool selected = (state->mod_state >> mod_bit_order[i]) & 1 ||
+                        (state->mod_state >> (mod_bit_order[i] + 4)) & 1;
         int current_x = base_x + offsets_box[i][0];
         int current_y = base_y + offsets_box[i][1];
         const lv_img_dsc_t *img = selected ? mod_imgs_active[i] : mod_imgs_normal[i];
@@ -370,7 +377,8 @@ static void draw_mods_status(lv_obj_t *canvas, const struct status_state *state)
     };
 
     for (int i = 0; i < 4; i++) {
-        bool selected = (state->mod_state >> i) & 1 || (state->mod_state >> (i + 4)) & 1;
+        bool selected = (state->mod_state >> mod_bit_order[i]) & 1 ||
+                        (state->mod_state >> (mod_bit_order[i] + 4)) & 1;
         int current_x = base_x + offsets_default[i][0];
         int current_y = base_y + offsets_default[i][1];
         const lv_img_dsc_t *img = selected ? mod_imgs_active[i] : mod_imgs_normal[i];
@@ -380,7 +388,7 @@ static void draw_mods_status(lv_obj_t *canvas, const struct status_state *state)
 
 #else
     // --- MODO LETRAS (Texto) ---
-    const char *items[4] = {"C", "S", "A", "G"};
+    const char *items[4] = {"G", "A", "C", "S"};
 
     // Descriptores de dibujo
     lv_draw_rect_dsc_t rect_black_dsc;
@@ -421,7 +429,8 @@ static void draw_mods_status(lv_obj_t *canvas, const struct status_state *state)
     const int base_y = 38;
 
     for (int i = 0; i < 4; i++) {
-        bool selected = (state->mod_state >> i) & 1 || (state->mod_state >> (i + 4)) & 1;
+        bool selected = (state->mod_state >> mod_bit_order[i]) & 1 ||
+                        (state->mod_state >> (mod_bit_order[i] + 4)) & 1;
         int current_x = base_x;
         int current_y = base_y + i * (box_height + 2);
 
@@ -441,7 +450,8 @@ static void draw_mods_status(lv_obj_t *canvas, const struct status_state *state)
     const int base_y = CONFIG_NICE_OLED_WIDGET_MODIFIERS_CUSTOM_Y;
 
     for (int i = 0; i < 4; i++) {
-        bool selected = (state->mod_state >> i) & 1 || (state->mod_state >> (i + 4)) & 1;
+        bool selected = (state->mod_state >> mod_bit_order[i]) & 1 ||
+                        (state->mod_state >> (mod_bit_order[i] + 4)) & 1;
         int current_x = base_x + i * (box_width + 2);
         int current_y = base_y;
 
@@ -465,7 +475,8 @@ static void draw_mods_status(lv_obj_t *canvas, const struct status_state *state)
     };
 
     for (int i = 0; i < 4; i++) {
-        bool selected = (state->mod_state >> i) & 1 || (state->mod_state >> (i + 4)) & 1;
+        bool selected = (state->mod_state >> mod_bit_order[i]) & 1 ||
+                        (state->mod_state >> (mod_bit_order[i] + 4)) & 1;
         int current_x = base_x + offsets_box[i][0];
         int current_y = base_y + offsets_box[i][1];
 
@@ -489,7 +500,8 @@ static void draw_mods_status(lv_obj_t *canvas, const struct status_state *state)
     };
 
     for (int i = 0; i < 4; i++) {
-        bool selected = (state->mod_state >> i) & 1 || (state->mod_state >> (i + 4)) & 1;
+        bool selected = (state->mod_state >> mod_bit_order[i]) & 1 ||
+                        (state->mod_state >> (mod_bit_order[i] + 4)) & 1;
         int current_x = base_x + offsets_default[i][0];
         int current_y = base_y + offsets_default[i][1];
 

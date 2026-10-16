@@ -16,7 +16,7 @@ LV_IMG_DECLARE(profile);
 LV_IMG_DECLARE(profile_active);
 #endif
 
-#if !IS_ENABLED(CONFIG_NICE_OLED_WIDGET_PROFILE_BIG)
+#if !IS_ENABLED(CONFIG_NICE_OLED_WIDGET_PROFILE_BIG) && !IS_ENABLED(CONFIG_NICE_EPAPER_ON)
 static void draw_inactive_profiles(lv_obj_t *canvas, const struct status_state *state) {
     lv_draw_img_dsc_t img_dsc;
     lv_draw_img_dsc_init(&img_dsc);
@@ -61,7 +61,11 @@ void draw_profile_status(lv_obj_t *canvas, const struct status_state *state) {
                            i == state->active_profile_index ? &profile_active : &profile, &img_dsc);
     }
 #else
+#if !IS_ENABLED(CONFIG_NICE_EPAPER_ON)
+    // epaper: the active profile is shown as "P<n>" next to the battery
+    // (battery.c), so the tiny 31x3 dot strip at the bottom is dropped.
     draw_inactive_profiles(canvas, state);
     draw_active_profile(canvas, state);
+#endif
 #endif
 }
