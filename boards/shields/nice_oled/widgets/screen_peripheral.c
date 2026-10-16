@@ -23,23 +23,23 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_ANIMATION_PERIPHERAL_SMART_BATTERY)
 #include <zmk/events/position_state_changed.h>
 
-// Pre-rotated bongo cat frames (assets/bongo_rot.c) drawn on the canvas.
-// The cat slaps (alternating paws) on every local key press of this half and
-// returns to idle via an LVGL one-shot timer.
-LV_IMG_DECLARE(bongo_rot_idle);
-LV_IMG_DECLARE(bongo_rot_tap_l);
-LV_IMG_DECLARE(bongo_rot_tap_r);
-LV_IMG_DECLARE(bongo_rot_dtap_a);
-LV_IMG_DECLARE(bongo_rot_dtap_b);
+// Luna (assets/luna_images.c, stored upright — no rotation needed) drawn on
+// the canvas: sits when idle, walks on every local key press of this half,
+// runs when typing fast, and sits again via an LVGL one-shot timer.
+LV_IMG_DECLARE(dog_sit1);
+LV_IMG_DECLARE(dog_walk1);
+LV_IMG_DECLARE(dog_walk2);
+LV_IMG_DECLARE(dog_run1);
+LV_IMG_DECLARE(dog_run2);
 
-// Presses closer together than this use the frantic double-tap frames
+// Presses closer together than this use the running frames
 #define BONGO_FAST_MS 200
 
-#define BONGO_X 9   // (68 - 50) / 2
-#define BONGO_Y 100
+#define BONGO_X 18  // (68 - 32) / 2
+#define BONGO_Y 110
 #define BONGO_IDLE_MS 400
 
-// 0 = idle, 1 = left slap, 2 = right slap, 3/4 = double-tap (fast typing)
+// 0 = sit (idle), 1/2 = walk (typing), 3/4 = run (fast typing)
 static uint8_t bongo_frame;
 static int64_t bongo_last_press_ms;
 static lv_timer_t *bongo_idle_timer;
@@ -88,11 +88,11 @@ static void draw_canvas(lv_obj_t *widget, lv_color_t cbuf[], const struct status
     {
         lv_draw_img_dsc_t img_dsc;
         lv_draw_img_dsc_init(&img_dsc);
-        const lv_img_dsc_t *frame = bongo_frame == 1   ? &bongo_rot_tap_l
-                                    : bongo_frame == 2 ? &bongo_rot_tap_r
-                                    : bongo_frame == 3 ? &bongo_rot_dtap_a
-                                    : bongo_frame == 4 ? &bongo_rot_dtap_b
-                                                       : &bongo_rot_idle;
+        const lv_img_dsc_t *frame = bongo_frame == 1   ? &dog_walk1
+                                    : bongo_frame == 2 ? &dog_walk2
+                                    : bongo_frame == 3 ? &dog_run1
+                                    : bongo_frame == 4 ? &dog_run2
+                                                       : &dog_sit1;
         lv_canvas_draw_img(canvas, BONGO_X, BONGO_Y, frame, &img_dsc);
     }
 #endif
@@ -180,7 +180,7 @@ ZMK_SUBSCRIPTION(widget_peripheral_status, zmk_split_peripheral_status_changed);
 
 #if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_ANIMATION_PERIPHERAL_SMART_BATTERY)
 /**
- * Bongo cat typing slaps (local key positions of this half only)
+ * Luna typing animation (local key positions of this half only)
  **/
 
 static void bongo_redraw_all(void) {
