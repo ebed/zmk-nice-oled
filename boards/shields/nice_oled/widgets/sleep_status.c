@@ -20,6 +20,7 @@ static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
 LV_IMG_DECLARE(vim_32x128);
 LV_IMG_DECLARE(vim_68x160);
 LV_IMG_DECLARE(sleep_oled);
+LV_IMG_DECLARE(sleep_zzz);
 
 static void set_sleep_img(struct zmk_widget_sleep_status *widget,
                           struct zmk_activity_state_changed ev) {
@@ -70,7 +71,8 @@ int zmk_widget_sleep_status_init(struct zmk_widget_sleep_status *widget, lv_obj_
     lv_obj_set_size(widget->obj, 160, 68);
     widget->art = lv_img_create(widget->obj);
 #if IS_ENABLED(CONFIG_NICE_EPAPER_ON)
-    lv_img_set_src(widget->art, &vim_68x160);
+    // Sleeping face with Zzz instead of the vim logo
+    lv_img_set_src(widget->art, &sleep_zzz);
 #else
     // lv_img_set_src(widget->art, &sleep_oled);
     lv_img_set_src(widget->art, &vim_32x128);
