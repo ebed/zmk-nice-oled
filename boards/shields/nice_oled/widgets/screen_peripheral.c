@@ -23,17 +23,20 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_ANIMATION_PERIPHERAL_SMART_BATTERY)
 #include <zmk/events/position_state_changed.h>
 
-// Pre-rotated crystal frames (assets/crystal_rot.c), drawn on the canvas so the
-// battery drain mask and the typing pulse share the vertical coordinate space.
-LV_IMG_DECLARE(crystal_rot_a);
-LV_IMG_DECLARE(crystal_rot_b);
+// Pre-rotated bongo cat frames (assets/bongo_rot.c) drawn on the canvas.
+// The cat slaps (alternating paws) on every local key press of this half and
+// returns to idle via an LVGL one-shot timer.
+LV_IMG_DECLARE(bongo_rot_idle);
+LV_IMG_DECLARE(bongo_rot_tap_l);
+LV_IMG_DECLARE(bongo_rot_tap_r);
 
-#define CRYSTAL_X 0
-#define CRYSTAL_Y 78
-#define CRYSTAL_W 68
-#define CRYSTAL_H 69
+#define BONGO_X 9   // (68 - 50) / 2
+#define BONGO_Y 100
+#define BONGO_IDLE_MS 400
 
-static bool crystal_flip;
+// 0 = idle, 1 = left slap, 2 = right slap
+static uint8_t bongo_frame;
+static lv_timer_t *bongo_idle_timer;
 #endif
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
@@ -76,19 +79,13 @@ static void draw_canvas(lv_obj_t *widget, lv_color_t cbuf[], const struct status
     draw_battery_status(canvas, state);
 
 #if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_ANIMATION_PERIPHERAL_SMART_BATTERY)
-    if (!state->charging) {
-        // Crystal as battery gauge: drains from the top as the level drops.
-        // While charging, the full animimg animation overlays instead.
+    {
         lv_draw_img_dsc_t img_dsc;
         lv_draw_img_dsc_init(&img_dsc);
-        lv_canvas_draw_img(canvas, CRYSTAL_X, CRYSTAL_Y,
-                           crystal_flip ? &crystal_rot_b : &crystal_rot_a, &img_dsc);
-        int drain = (100 - state->battery) * CRYSTAL_H / 100;
-        if (drain > 0) {
-            lv_draw_rect_dsc_t rect_dsc;
-            init_rect_dsc(&rect_dsc, LVGL_BACKGROUND);
-            lv_canvas_draw_rect(canvas, CRYSTAL_X, CRYSTAL_Y, CRYSTAL_W, drain, &rect_dsc);
-        }
+        const lv_img_dsc_t *frame = bongo_frame == 1   ? &bongo_rot_tap_l
+                                    : bongo_frame == 2 ? &bongo_rot_tap_r
+                                                       : &bongo_rot_idle;
+        lv_canvas_draw_img(canvas, BONGO_X, BONGO_Y, frame, &img_dsc);
     }
 #endif
 
@@ -121,18 +118,8 @@ static void set_battery_status(struct zmk_widget_screen *widget,
 
     // draw_animation(widget->obj, widget);
 
-#if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_ANIMATION_PERIPHERAL_SMART_BATTERY)
-    if (widget->state.charging) {
-        // mostrar
-        // lv_obj_clear_flag(widget->obj, LV_OBJ_FLAG_HIDDEN);
-        animation_smart_battery_on(widget->obj);
-
-    } else {
-        // quitar
-        // lv_obj_add_flag(widget->art, LV_OBJ_FLAG_HIDDEN);
-        animation_smart_battery_off(widget->obj);
-    }
-#endif
+    // Charging is indicated by the bolt next to BAT; the canvas bongo cat
+    // replaces the old animimg crystal (which leaked one object per event).
 }
 
 static void battery_status_update_cb(struct battery_status_state state) {
@@ -185,38 +172,46 @@ ZMK_SUBSCRIPTION(widget_peripheral_status, zmk_split_peripheral_status_changed);
 
 #if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_ANIMATION_PERIPHERAL_SMART_BATTERY)
 /**
- * Crystal typing pulse (local key positions of this half only)
+ * Bongo cat typing slaps (local key positions of this half only)
  **/
 
-struct crystal_pulse_state {
-    bool flip;
-};
-
-static struct crystal_pulse_state crystal_pulse_get_state(const zmk_event_t *eh) {
-    const struct zmk_position_state_changed *ev = as_zmk_position_state_changed(eh);
-    bool flip = crystal_flip;
-    if (ev != NULL && ev->state) {
-        flip = !flip;
-    }
-    return (struct crystal_pulse_state){.flip = flip};
-}
-
-static void crystal_pulse_update_cb(struct crystal_pulse_state state) {
-    if (state.flip == crystal_flip) {
-        return;
-    }
-    crystal_flip = state.flip;
+static void bongo_redraw_all(void) {
     struct zmk_widget_screen *widget;
     SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
-        if (!widget->state.charging) {
-            draw_canvas(widget->obj, widget->cbuf, &widget->state);
-        }
+        draw_canvas(widget->obj, widget->cbuf, &widget->state);
     }
 }
 
-ZMK_DISPLAY_WIDGET_LISTENER(widget_crystal_pulse, struct crystal_pulse_state,
-                            crystal_pulse_update_cb, crystal_pulse_get_state)
-ZMK_SUBSCRIPTION(widget_crystal_pulse, zmk_position_state_changed);
+static void bongo_idle_timer_cb(lv_timer_t *timer) {
+    bongo_frame = 0;
+    lv_timer_pause(timer);
+    bongo_redraw_all();
+}
+
+struct bongo_slap_state {
+    bool pressed;
+};
+
+static struct bongo_slap_state bongo_slap_get_state(const zmk_event_t *eh) {
+    const struct zmk_position_state_changed *ev = as_zmk_position_state_changed(eh);
+    return (struct bongo_slap_state){.pressed = ev != NULL && ev->state};
+}
+
+static void bongo_slap_update_cb(struct bongo_slap_state state) {
+    if (!state.pressed) {
+        return;
+    }
+    bongo_frame = (bongo_frame == 1) ? 2 : 1;
+    if (bongo_idle_timer != NULL) {
+        lv_timer_reset(bongo_idle_timer);
+        lv_timer_resume(bongo_idle_timer);
+    }
+    bongo_redraw_all();
+}
+
+ZMK_DISPLAY_WIDGET_LISTENER(widget_bongo_slap, struct bongo_slap_state,
+                            bongo_slap_update_cb, bongo_slap_get_state)
+ZMK_SUBSCRIPTION(widget_bongo_slap, zmk_position_state_changed);
 #endif // CONFIG_NICE_OLED_WIDGET_ANIMATION_PERIPHERAL_SMART_BATTERY
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
@@ -266,7 +261,9 @@ int zmk_widget_screen_init(struct zmk_widget_screen *widget, lv_obj_t *parent) {
     widget_battery_status_init();
     widget_peripheral_status_init();
 #if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_ANIMATION_PERIPHERAL_SMART_BATTERY)
-    widget_crystal_pulse_init();
+    bongo_idle_timer = lv_timer_create(bongo_idle_timer_cb, BONGO_IDLE_MS, NULL);
+    lv_timer_pause(bongo_idle_timer);
+    widget_bongo_slap_init();
 #endif
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
     widget_peripheral_caps_init();

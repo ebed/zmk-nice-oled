@@ -114,6 +114,9 @@ ZMK_SUBSCRIPTION(widget_hid_indicators, zmk_hid_indicators_changed);
 
 int zmk_widget_hid_indicators_init(struct zmk_widget_hid_indicators *widget, lv_obj_t *parent) {
     widget->obj = lv_label_create(parent);
+    // A fresh LVGL label shows the default string "Text" until the first
+    // hid_indicators event arrives; clear it so no ghost glyphs render.
+    lv_label_set_text(widget->obj, "");
 
     sys_slist_append(&widgets, &widget->node);
 
