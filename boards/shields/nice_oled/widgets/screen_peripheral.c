@@ -29,13 +29,19 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 LV_IMG_DECLARE(bongo_rot_idle);
 LV_IMG_DECLARE(bongo_rot_tap_l);
 LV_IMG_DECLARE(bongo_rot_tap_r);
+LV_IMG_DECLARE(bongo_rot_dtap_a);
+LV_IMG_DECLARE(bongo_rot_dtap_b);
+
+// Presses closer together than this use the frantic double-tap frames
+#define BONGO_FAST_MS 200
 
 #define BONGO_X 9   // (68 - 50) / 2
 #define BONGO_Y 100
 #define BONGO_IDLE_MS 400
 
-// 0 = idle, 1 = left slap, 2 = right slap
+// 0 = idle, 1 = left slap, 2 = right slap, 3/4 = double-tap (fast typing)
 static uint8_t bongo_frame;
+static int64_t bongo_last_press_ms;
 static lv_timer_t *bongo_idle_timer;
 #endif
 
@@ -84,6 +90,8 @@ static void draw_canvas(lv_obj_t *widget, lv_color_t cbuf[], const struct status
         lv_draw_img_dsc_init(&img_dsc);
         const lv_img_dsc_t *frame = bongo_frame == 1   ? &bongo_rot_tap_l
                                     : bongo_frame == 2 ? &bongo_rot_tap_r
+                                    : bongo_frame == 3 ? &bongo_rot_dtap_a
+                                    : bongo_frame == 4 ? &bongo_rot_dtap_b
                                                        : &bongo_rot_idle;
         lv_canvas_draw_img(canvas, BONGO_X, BONGO_Y, frame, &img_dsc);
     }
@@ -201,7 +209,14 @@ static void bongo_slap_update_cb(struct bongo_slap_state state) {
     if (!state.pressed) {
         return;
     }
-    bongo_frame = (bongo_frame == 1) ? 2 : 1;
+    int64_t now = k_uptime_get();
+    bool fast = (now - bongo_last_press_ms) < BONGO_FAST_MS;
+    bongo_last_press_ms = now;
+    if (fast) {
+        bongo_frame = (bongo_frame == 3) ? 4 : 3;
+    } else {
+        bongo_frame = (bongo_frame == 1) ? 2 : 1;
+    }
     if (bongo_idle_timer != NULL) {
         lv_timer_reset(bongo_idle_timer);
         lv_timer_resume(bongo_idle_timer);
