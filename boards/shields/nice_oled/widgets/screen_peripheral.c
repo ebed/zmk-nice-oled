@@ -17,6 +17,30 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include "battery.h"
 #include "output.h"
 #include "screen_peripheral.h"
+#include "util.h"
+#include <fonts.h>
+
+#if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_ANIMATION_PERIPHERAL_SMART_BATTERY)
+#include <zmk/events/position_state_changed.h>
+
+// Pre-rotated crystal frames (assets/crystal_rot.c), drawn on the canvas so the
+// battery drain mask and the typing pulse share the vertical coordinate space.
+LV_IMG_DECLARE(crystal_rot_a);
+LV_IMG_DECLARE(crystal_rot_b);
+
+#define CRYSTAL_X 0
+#define CRYSTAL_Y 78
+#define CRYSTAL_W 68
+#define CRYSTAL_H 69
+
+static bool crystal_flip;
+#endif
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
+#include <zmk/events/hid_indicators_changed.h>
+
+static bool caps_active;
+#endif
 
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
 
@@ -50,6 +74,31 @@ static void draw_canvas(lv_obj_t *widget, lv_color_t cbuf[], const struct status
     draw_background(canvas);
     draw_output_status(canvas, state);
     draw_battery_status(canvas, state);
+
+#if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_ANIMATION_PERIPHERAL_SMART_BATTERY)
+    if (!state->charging) {
+        // Crystal as battery gauge: drains from the top as the level drops.
+        // While charging, the full animimg animation overlays instead.
+        lv_draw_img_dsc_t img_dsc;
+        lv_draw_img_dsc_init(&img_dsc);
+        lv_canvas_draw_img(canvas, CRYSTAL_X, CRYSTAL_Y,
+                           crystal_flip ? &crystal_rot_b : &crystal_rot_a, &img_dsc);
+        int drain = (100 - state->battery) * CRYSTAL_H / 100;
+        if (drain > 0) {
+            lv_draw_rect_dsc_t rect_dsc;
+            init_rect_dsc(&rect_dsc, LVGL_BACKGROUND);
+            lv_canvas_draw_rect(canvas, CRYSTAL_X, CRYSTAL_Y, CRYSTAL_W, drain, &rect_dsc);
+        }
+    }
+#endif
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
+    if (caps_active) {
+        lv_draw_label_dsc_t caps_dsc;
+        init_label_dsc(&caps_dsc, LVGL_FOREGROUND, &pixel_operator_mono_16, LV_TEXT_ALIGN_LEFT);
+        lv_canvas_draw_text(canvas, 0, 36, 68, &caps_dsc, "CAPS");
+    }
+#endif
 
     // Rotate for horizontal display
     rotate_canvas(canvas, cbuf);
@@ -134,6 +183,69 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_peripheral_status, struct peripheral_status_s
                             output_status_update_cb, get_state)
 ZMK_SUBSCRIPTION(widget_peripheral_status, zmk_split_peripheral_status_changed);
 
+#if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_ANIMATION_PERIPHERAL_SMART_BATTERY)
+/**
+ * Crystal typing pulse (local key positions of this half only)
+ **/
+
+struct crystal_pulse_state {
+    bool flip;
+};
+
+static struct crystal_pulse_state crystal_pulse_get_state(const zmk_event_t *eh) {
+    const struct zmk_position_state_changed *ev = as_zmk_position_state_changed(eh);
+    bool flip = crystal_flip;
+    if (ev != NULL && ev->state) {
+        flip = !flip;
+    }
+    return (struct crystal_pulse_state){.flip = flip};
+}
+
+static void crystal_pulse_update_cb(struct crystal_pulse_state state) {
+    if (state.flip == crystal_flip) {
+        return;
+    }
+    crystal_flip = state.flip;
+    struct zmk_widget_screen *widget;
+    SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
+        if (!widget->state.charging) {
+            draw_canvas(widget->obj, widget->cbuf, &widget->state);
+        }
+    }
+}
+
+ZMK_DISPLAY_WIDGET_LISTENER(widget_crystal_pulse, struct crystal_pulse_state,
+                            crystal_pulse_update_cb, crystal_pulse_get_state)
+ZMK_SUBSCRIPTION(widget_crystal_pulse, zmk_position_state_changed);
+#endif // CONFIG_NICE_OLED_WIDGET_ANIMATION_PERIPHERAL_SMART_BATTERY
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
+/**
+ * Caps lock (HID indicator state relayed from the central by ZMK)
+ **/
+
+struct peripheral_caps_state {
+    bool caps;
+};
+
+static struct peripheral_caps_state peripheral_caps_get_state(const zmk_event_t *eh) {
+    const struct zmk_hid_indicators_changed *ev = as_zmk_hid_indicators_changed(eh);
+    return (struct peripheral_caps_state){.caps = ev != NULL && (ev->indicators & BIT(1))};
+}
+
+static void peripheral_caps_update_cb(struct peripheral_caps_state state) {
+    caps_active = state.caps;
+    struct zmk_widget_screen *widget;
+    SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
+        draw_canvas(widget->obj, widget->cbuf, &widget->state);
+    }
+}
+
+ZMK_DISPLAY_WIDGET_LISTENER(widget_peripheral_caps, struct peripheral_caps_state,
+                            peripheral_caps_update_cb, peripheral_caps_get_state)
+ZMK_SUBSCRIPTION(widget_peripheral_caps, zmk_hid_indicators_changed);
+#endif // CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS
+
 /**
  * Initialization
  **/
@@ -153,6 +265,12 @@ int zmk_widget_screen_init(struct zmk_widget_screen *widget, lv_obj_t *parent) {
 #endif
     widget_battery_status_init();
     widget_peripheral_status_init();
+#if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_ANIMATION_PERIPHERAL_SMART_BATTERY)
+    widget_crystal_pulse_init();
+#endif
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
+    widget_peripheral_caps_init();
+#endif
 
 #if IS_ENABLED(CONFIG_NICE_OLED_WIDGET_ANIMATION_PERIPHERAL_WPM)
     zmk_widget_luna_init(&luna_widget, canvas);

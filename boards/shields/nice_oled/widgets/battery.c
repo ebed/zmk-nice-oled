@@ -51,13 +51,16 @@ void animation_smart_battery_on(lv_obj_t *canvas) {
     lv_obj_align(art, LV_ALIGN_TOP_LEFT, CONFIG_NICE_OLED_WIDGET_ANIMATION_PERIPHERAL_CUSTOM_X, CONFIG_NICE_OLED_WIDGET_ANIMATION_PERIPHERAL_CUSTOM_Y);
 }
 void animation_smart_battery_off(lv_obj_t *canvas) {
+    // The discharging crystal is now drawn on the canvas (screen_peripheral.c)
+    // with a battery-level drain mask, so only remove the charging animation.
     if (art) {
         lv_obj_del(art);
         art = NULL;
     }
-    art2 = lv_img_create(canvas);
-    lv_img_set_src(art2, SET_ANIMATION_SMART_BATTERY_OFF);
-    lv_obj_align(art2, LV_ALIGN_TOP_LEFT, CONFIG_NICE_OLED_WIDGET_ANIMATION_PERIPHERAL_CUSTOM_X, CONFIG_NICE_OLED_WIDGET_ANIMATION_PERIPHERAL_CUSTOM_Y);
+    if (art2) {
+        lv_obj_del(art2);
+        art2 = NULL;
+    }
 }
 #endif
 
